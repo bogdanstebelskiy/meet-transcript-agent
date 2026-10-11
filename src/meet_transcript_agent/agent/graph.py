@@ -3,7 +3,7 @@ from functools import partial
 from langgraph.checkpoint.base import BaseCheckpointSaver
 from langgraph.graph import END, START, StateGraph
 
-from document_agent.agent.nodes import (
+from meet_transcript_agent.agent.nodes import (
     generate,
     reset_turn,
     respond_direct,
@@ -11,7 +11,7 @@ from document_agent.agent.nodes import (
     rewrite_query,
     route,
 )
-from document_agent.agent.state import AgentDeps, AgentState
+from meet_transcript_agent.agent.state import AgentDeps, AgentState
 
 
 def route_decision(state: AgentState):

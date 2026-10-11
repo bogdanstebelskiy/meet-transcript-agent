@@ -1,7 +1,7 @@
 [project]
-name = "document-agent"
+name = "meet-transcript-agent"
 version = "0.1.0"
-description = "Add your description here"
+description = "Meeting transcript RAG agent powered by whisper.cpp"
 readme = "README.md"
 authors = [
     { name = "bogdanstebelskiy", email = "bogdanstebelskiy@gmail.com" }
@@ -10,7 +10,6 @@ requires-python = ">=3.13"
 dependencies = [
     "langchain-chroma>=1.1.0",
     "langchain-ollama>=1.1.0",
-    "langchain-text-splitters>=1.1.3",
     "langgraph>=1.2.13",
     "langgraph-checkpoint-sqlite>=3.1.1",
     "pydantic-settings>=2.15.0",
@@ -19,9 +18,7 @@ dependencies = [
 ]
 
 [project.scripts]
-document-agent = "document_agent.cli:app"
-stats = "document_agent.cli:stats"
-ingest = "document_agent.cli:ingest"
+meet-transcript-agent = "meet_transcript_agent.cli:app"
 
 [build-system]
 requires = ["uv_build>=0.12.21,<0.13.0"]

@@ -1,11 +1,11 @@
 import hashlib
-import os
-from pathlib import Path
 
 from pydantic import BaseModel
 
 MetadataValue = str | int | float | bool
 Metadata = dict[str, MetadataValue]
+
+TRANSCRIPT_CONTENT_TYPE = "text/transcript"
 
 
 class Document(BaseModel):
@@ -25,11 +25,9 @@ class Chunk(BaseModel):
     metadata: Metadata
 
 
-def doc_id_for(path: str | Path) -> str:
-    resolved = Path(path).resolve()
-    normalized = os.path.normcase(str(resolved))
-
-    return hashlib.sha1(normalized.encode("utf-8")).hexdigest()
+def doc_id_for_transcript(meeting_id: str, speaker: str) -> str:
+    key = f"{meeting_id}:{speaker}"
+    return hashlib.sha1(key.encode("utf-8")).hexdigest()
 
 
 def chunk_id_for(doc_id: str, index: int) -> str:

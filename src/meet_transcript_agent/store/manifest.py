@@ -3,8 +3,8 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Self
 
-from document_agent.config import Settings
-from document_agent.config import settings as default_settings
+from meet_transcript_agent.config import Settings
+from meet_transcript_agent.config import settings as default_settings
 
 
 @dataclass(frozen=True, slots=True)

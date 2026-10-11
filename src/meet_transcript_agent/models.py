@@ -2,7 +2,7 @@ from functools import lru_cache
 
 from langchain_ollama import ChatOllama, OllamaEmbeddings
 
-from document_agent.config import settings
+from meet_transcript_agent.config import settings
 
 
 @lru_cache(maxsize=1)

@@ -1,23 +1,28 @@
 import logging
 import re
-from pathlib import PurePath
 
 from langchain_core.exceptions import OutputParserException
 from langchain_core.messages import AIMessage, HumanMessage
 from pydantic import ValidationError
 
-from document_agent.agent.prompts import GENERATION_PROMPT
-from document_agent.agent.state import AgentDeps, AgentState, RouteDecision
+from meet_transcript_agent.agent.prompts import GENERATION_PROMPT
+from meet_transcript_agent.agent.state import AgentDeps, AgentState, RouteDecision
 
 logger = logging.getLogger(__name__)
 
+MAX_DISTANCE = 1.2
+
+
+def _format_timestamp(seconds: float) -> str:
+    minutes, secs = divmod(int(seconds), 60)
+    return f"{minutes:02d}:{secs:02d}"
+
 
 def _source_label(chunk) -> str:
-    raw = chunk.metadata.get("source_uri", "unknown")
-    return PurePath(raw).name
-
-
-MAX_DISTANCE = 0.85
+    speaker = chunk.metadata.get("speaker", "unknown")
+    start = chunk.metadata.get("start_ts", 0.0)
+    end = chunk.metadata.get("end_ts", 0.0)
+    return f"{speaker}, {_format_timestamp(start)}-{_format_timestamp(end)}"
 
 
 def retrieve(state: AgentState, *, deps: AgentDeps) -> dict:
@@ -53,7 +58,7 @@ def generate(state: AgentState, *, deps: AgentDeps) -> dict:
 
     cited_indices = {int(m) for m in re.findall(r"\[(\d+)\]", answer_text)}
     citations = [
-        f"[{i}] {_source_label(chunks[i - 1])} (chunk {chunks[i - 1].index})"
+        f"[{i}] {_source_label(chunks[i - 1])}"
         for i in sorted(cited_indices)
         if 1 <= i <= len(chunks)
     ]
@@ -145,11 +150,11 @@ def reset_turn(state: AgentState, *, deps: AgentDeps) -> dict:
             "conversation. The subject is usually the main topic being "
             "discussed, not a sub-concept.\n\n"
             "Examples:\n"
-            "- History about PostgreSQL connection pooling, follow-up "
-            "\"Does it support transactions?\" -> "
-            "\"Does PostgreSQL support transactions?\"\n"
-            "- History about React hooks, follow-up "
-            "\"How do I test them?\" -> \"How do I test React hooks?\"\n\n"
+            "- History about a standup meeting, follow-up "
+            "\"What did they say about it?\" -> "
+            "\"What did the team say about the deadline?\"\n"
+            "- History about API discussion, follow-up "
+            "\"Who volunteered?\" -> \"Who volunteered to work on the API?\"\n\n"
             f"Follow-up: {question}\n"
             "Standalone query:"
         ).content.strip()

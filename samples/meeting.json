@@ -1,0 +1,6 @@
+{
+  "meeting_id": "test-001",
+  "title": "Test meeting",
+  "date": "2026-10-11",
+  "participants": ["jfk"]
+}

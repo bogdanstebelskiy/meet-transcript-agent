@@ -1,9 +1,9 @@
 from langchain_chroma import Chroma
 
-from document_agent.config import Settings
-from document_agent.config import settings as default_settings
-from document_agent.domain import Chunk
-from document_agent.models import get_embeddings
+from meet_transcript_agent.config import Settings
+from meet_transcript_agent.config import settings as default_settings
+from meet_transcript_agent.domain import Chunk
+from meet_transcript_agent.models import get_embeddings
 
 
 class VectorStore:

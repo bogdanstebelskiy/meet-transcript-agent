@@ -7,7 +7,7 @@ from langchain_core.messages import AnyMessage
 from langgraph.graph.message import add_messages
 from pydantic import BaseModel
 
-from document_agent.domain import Chunk
+from meet_transcript_agent.domain import Chunk
 
 
 class AgentState(TypedDict):
@@ -32,7 +32,7 @@ class AgentDeps:
 
     @staticmethod
     def default() -> AgentDeps:
-        from document_agent.models import get_llm
-        from document_agent.store.vector import VectorStore
+        from meet_transcript_agent.models import get_llm
+        from meet_transcript_agent.store.vector import VectorStore
 
         return AgentDeps(llm=get_llm(), vector_store=VectorStore.default())
