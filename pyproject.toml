@@ -24,6 +24,10 @@ meet-transcript-agent = "meet_transcript_agent.cli:app"
 requires = ["uv_build>=0.12.21,<0.13.0"]
 build-backend = "uv_build"
 
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "--import-mode=importlib"
+
 [dependency-groups]
 dev = [
     "pytest>=9.1.1",

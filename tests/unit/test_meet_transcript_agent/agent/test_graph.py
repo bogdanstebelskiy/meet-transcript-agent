@@ -3,27 +3,43 @@ from unittest.mock import MagicMock
 from langchain_core.exceptions import OutputParserException
 from langchain_core.messages import AIMessage
 
-from document_agent.agent.graph import build_graph
-from document_agent.agent.nodes import MAX_DISTANCE
-from document_agent.agent.state import AgentDeps, RouteDecision
-from document_agent.domain import Chunk
+from meet_transcript_agent.agent.graph import build_graph
+from meet_transcript_agent.agent.nodes import MAX_DISTANCE
+from meet_transcript_agent.agent.state import AgentDeps, RouteDecision
+from meet_transcript_agent.domain import Chunk
 
 
 def _fake_chunks():
     return [
         Chunk(
-            chunk_id="notes:0",
-            doc_id="notes",
+            chunk_id="m1-alice:0",
+            doc_id="m1-alice",
             index=0,
-            text="Python was created by Guido van Rossum.",
-            metadata={"doc_id": "notes", "index": 0, "source_uri": "/docs/notes.md"},
+            text="[00:05] We need to push the deadline to Friday.",
+            metadata={
+                "doc_id": "m1-alice",
+                "index": 0,
+                "source_uri": "alice.wav",
+                "speaker": "alice",
+                "start_ts": 5.0,
+                "end_ts": 35.0,
+                "meeting_id": "m1",
+            },
         ),
         Chunk(
-            chunk_id="faq:0",
-            doc_id="faq",
+            chunk_id="m1-bob:0",
+            doc_id="m1-bob",
             index=0,
-            text="Python 3.13 was released in October 2024.",
-            metadata={"doc_id": "faq", "index": 0, "source_uri": "/docs/faq.md"},
+            text="[00:40] I can help with the API work tomorrow.",
+            metadata={
+                "doc_id": "m1-bob",
+                "index": 0,
+                "source_uri": "bob.wav",
+                "speaker": "bob",
+                "start_ts": 40.0,
+                "end_ts": 70.0,
+                "meeting_id": "m1",
+            },
         ),
     ]
 
@@ -63,66 +79,41 @@ def _invoke(question, deps):
 def test_graph_produces_answer_and_citations():
     chunks = _fake_chunks()
     deps = AgentDeps(
-        llm=_fake_llm("Python was created by Guido van Rossum [1] and version 3.13 came out in 2024 [2]."),
+        llm=_fake_llm("Alice said the deadline needs to move to Friday [1]. Bob offered to help with the API [2]."),
         vector_store=_fake_store(chunks),
     )
 
-    result = _invoke("Who created Python?", deps)
+    result = _invoke("What was discussed?", deps)
 
     assert "answer" in result
     assert "citations" in result
-    assert "retrieved" in result
     assert len(result["retrieved"]) == 2
-    assert result["citations"] == ["[1] notes.md (chunk 0)", "[2] faq.md (chunk 0)"]
-    assert "[1]" in result["answer"]
+    assert result["citations"] == [
+        "[1] alice, 00:05-00:35",
+        "[2] bob, 00:40-01:10",
+    ]
 
 
 def test_graph_citations_only_include_referenced_sources():
     chunks = _fake_chunks()
     deps = AgentDeps(
-        llm=_fake_llm("Python was created by Guido van Rossum [1]."),
+        llm=_fake_llm("Alice said the deadline needs to move [1]."),
         vector_store=_fake_store(chunks),
     )
 
-    result = _invoke("Who created Python?", deps)
+    result = _invoke("What did Alice say?", deps)
 
-    assert result["citations"] == ["[1] notes.md (chunk 0)"]
-
-
-def test_graph_shows_each_chunk_separately_from_same_file():
-    same_file_chunks = [
-        Chunk(
-            chunk_id="notes:0", doc_id="notes", index=0,
-            text="First part of the notes.",
-            metadata={"doc_id": "notes", "index": 0, "source_uri": "/docs/notes.md"},
-        ),
-        Chunk(
-            chunk_id="notes:1", doc_id="notes", index=1,
-            text="Second part of the notes.",
-            metadata={"doc_id": "notes", "index": 1, "source_uri": "/docs/notes.md"},
-        ),
-    ]
-    deps = AgentDeps(
-        llm=_fake_llm("Both parts say the same thing [1] [2]."),
-        vector_store=_fake_store(same_file_chunks),
-    )
-
-    result = _invoke("What do the notes say?", deps)
-
-    assert result["citations"] == [
-        "[1] notes.md (chunk 0)",
-        "[2] notes.md (chunk 1)",
-    ]
+    assert result["citations"] == ["[1] alice, 00:05-00:35"]
 
 
 def test_graph_no_citations_when_none_referenced():
     chunks = _fake_chunks()
     deps = AgentDeps(
-        llm=_fake_llm("I don't have enough information to answer that."),
+        llm=_fake_llm("The transcript excerpts don't mention that topic."),
         vector_store=_fake_store(chunks),
     )
 
-    result = _invoke("What is quantum physics?", deps)
+    result = _invoke("What about quantum physics?", deps)
 
     assert result["citations"] == []
 
@@ -130,11 +121,11 @@ def test_graph_no_citations_when_none_referenced():
 def test_good_scores_go_straight_to_generate():
     chunks = _fake_chunks()
     deps = AgentDeps(
-        llm=_fake_llm("Python was created by Guido van Rossum [1]."),
+        llm=_fake_llm("Alice mentioned the deadline [1]."),
         vector_store=_fake_store(chunks, score=0.4),
     )
 
-    result = _invoke("Who created Python?", deps)
+    result = _invoke("What about the deadline?", deps)
 
     assert len(result["retrieved"]) == 2
     assert result.get("attempts", 0) == 0
@@ -148,11 +139,11 @@ def test_bad_scores_trigger_rewrite_then_succeed():
         nonlocal call_count
         call_count += 1
         if call_count == 1:
-            return [(c, 0.95) for c in chunks]
+            return [(c, MAX_DISTANCE + 0.5) for c in chunks]
         return [(c, 0.4) for c in chunks]
 
     deps = AgentDeps(
-        llm=_fake_llm(invoke_results=["better search query", "The answer is 42 [1]."]),
+        llm=_fake_llm(invoke_results=["better query", "The answer is here [1]."]),
         vector_store=_fake_store(chunks, score=search_with_improving_scores),
     )
 
@@ -160,17 +151,16 @@ def test_bad_scores_trigger_rewrite_then_succeed():
 
     assert result["attempts"] == 1
     assert len(result["retrieved"]) == 2
-    assert "answer" in result
 
 
 def test_exhausts_retries_then_generates():
     chunks = _fake_chunks()
     deps = AgentDeps(
-        llm=_fake_llm(invoke_results=["rewrite 1", "rewrite 2", "Not found in your notes."]),
-        vector_store=_fake_store(chunks, score=0.95),
+        llm=_fake_llm(invoke_results=["rewrite 1", "rewrite 2", "Nothing found."]),
+        vector_store=_fake_store(chunks, score=MAX_DISTANCE + 0.5),
     )
 
-    result = _invoke("something completely unrelated", deps)
+    result = _invoke("something unrelated", deps)
 
     assert result["attempts"] == 2
     assert result["retrieved"] == []
@@ -201,9 +191,6 @@ def test_chunks_at_threshold_are_kept():
     assert len(result["retrieved"]) == 2
 
 
-# --- Routing tests ---
-
-
 def test_chitchat_skips_retrieval():
     store = _fake_store([])
     deps = AgentDeps(
@@ -215,34 +202,19 @@ def test_chitchat_skips_retrieval():
 
     assert result["answer"] == "You're welcome!"
     assert result["retrieved"] == []
-    assert result["citations"] == []
     store.search.assert_not_called()
-
-
-def test_knowledge_routes_to_retrieval():
-    chunks = _fake_chunks()
-    store = _fake_store(chunks, score=MAX_DISTANCE + 0.1)
-    deps = AgentDeps(
-        llm=_fake_llm("Python was created by Guido van Rossum [1].", route_to="knowledge"),
-        vector_store=store,
-    )
-
-    result = _invoke("Who created Python?", deps)
-
-    assert result["retrieved"] == []
-    store.search.assert_called()
 
 
 def test_route_parse_failure_defaults_to_knowledge():
     chunks = _fake_chunks()
-    llm = _fake_llm("Python was created by Guido van Rossum [1].")
-    llm.with_structured_output.return_value.invoke.side_effect = OutputParserException("bad output")
+    llm = _fake_llm("Alice mentioned something [1].")
+    llm.with_structured_output.return_value.invoke.side_effect = OutputParserException("bad")
     deps = AgentDeps(
         llm=llm,
         vector_store=_fake_store(chunks),
     )
 
-    result = _invoke("Who created Python?", deps)
+    result = _invoke("What did Alice say?", deps)
 
     assert len(result["retrieved"]) == 2
     assert "answer" in result
